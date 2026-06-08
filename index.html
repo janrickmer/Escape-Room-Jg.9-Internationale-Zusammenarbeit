@@ -1340,7 +1340,16 @@ window.downloadOverviewPDF=()=>{
     const b64=generateOverviewPdf();
     const safe=s=>(s||'').trim().replace(/[\\/:*?"<>|]+/g,'').replace(/\s+/g,'-');
     const fn=safe(state.firstName)||'Vorname', ln=safe(state.lastName)||'Nachname';
-    downloadPdfBase64(b64,`Escape-Room-Überblick_von_${fn}_${ln}.pdf`);
+    const filename=`Escape-Room-Überblick_von_${fn}_${ln}.pdf`;
+    const binary=atob(b64); const bytes=new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+    const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
+    // Download läuft im Hintergrund (kein Verlassen der Abschluss-Seite)
+    const link=document.createElement('a'); link.href=url; link.download=filename;
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    // PDF zusätzlich in neuem Tab öffnen; die Abschluss-Seite (mit Feiditor-Link) bleibt erhalten
+    window.open(url,'_blank');
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
   }catch(e){ console.error(e); alert('Konnte die Datei nicht erzeugen: '+e.message); }
 };
 window.downloadReflexionPDF=()=>{
