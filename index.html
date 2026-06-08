@@ -1087,7 +1087,7 @@ class PdfDoc{
     pdf+=`trailer\n<< /Size ${objects.length+1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
     return pdf;
   }
-  toBase64(){ return btoa(this.build()); }
+  toBase64(trailerComment){ let pdf=this.build(); if(trailerComment) pdf+=trailerComment; return btoa(pdf); }
 }
 
 /* ============================================================
@@ -1143,12 +1143,14 @@ function generateOverviewPdf(){
 
   let y=header('Überblick deiner Antworten & Erläuterungen');
 
-  // Pflichthinweis (fett, ganz oben)
-  doc.rect(M,y-44,CW,44,[255,246,212]);
-  doc.rect(M,y-44,3,44,ACCENT);
-  y=doc.paragraph('Diese Datei musst du bei Moodle in der dafür vorgesehenen Abgabe hochladen, um deinem Lehrer nachzuweisen, dass du den Escape-Room erfolgreich absolviert hast.',
+  // Pflichthinweis (fett) + Notfall-Tipp zum Standalone-Feiditor (ganz oben)
+  doc.rect(M,y-78,CW,78,[255,246,212]);
+  doc.rect(M,y-78,3,78,ACCENT);
+  let yTop=doc.paragraph('Diese Datei musst du bei Moodle in der dafür vorgesehenen Abgabe hochladen, um deinem Lehrer nachzuweisen, dass du den Escape-Room erfolgreich absolviert hast.',
     M+12,y-16,CW-24,10.5,true,PRIMARY,13.5);
-  y-=18;
+  doc.paragraph('Notfall-Tipp: Falls du den Link zum digitalen Arbeitsblatt (Feiditor) nicht mehr hast, kannst du diese PDF-Datei auf https://feiditor.janrickmer.de/ hochladen, um den Feiditor mit deinen Aufgaben erneut zu öffnen.',
+    M+12,yTop-4,CW-24,9,false,MUTE,12);
+  y-=78+14;
 
   // Identifikationsblock
   const blockH=78;
@@ -1243,7 +1245,12 @@ function generateOverviewPdf(){
   doc.text('Copyright Jan-Rickmer Feindt',M,y2,8.5,false,MUTE);
   doc.endPage();
 
-  return doc.toBase64();
+  // Versteckte Rekonstruktionsdaten für den Standalone-Feiditor (nach %%EOF; von PDF-Viewern ignoriert).
+  // Enthält Vorname, Nachname, die sechs Feiditor-Aufgaben und die beiden roten Feldtexte.
+  const escData={ v:state.firstName, n:state.lastName, t:REFLECT_TASKS.slice(0,6), r:RED_FIELDS };
+  let escB64=''; try{ escB64=btoa(unescape(encodeURIComponent(JSON.stringify(escData)))); }catch(e){ escB64=''; }
+  const trailer=escB64?('\n%ESCAPEDATA '+escB64+'\n'):'';
+  return doc.toBase64(trailer);
 }
 
 /* ============================================================
@@ -1258,6 +1265,14 @@ const REFLECT_TASKS = [
   'Begründe, warum internationale Zusammenarbeit heute wichtig ist. Nenne ein globales Problem, das nur gemeinsam gelöst werden kann. (Bibliothek 6)',
   'Bearbeite nun auf Moodle die Aufgabe „Text verfassen …".',
   'Lade diese Reflexions-Datei in der dafür vorgesehenen Abgabe bei Moodle hoch.',
+];
+
+/* Texte der beiden roten Felder im Feiditor – müssen exakt mit den moodle-hint-Feldern
+   im eingebetteten Feiditor übereinstimmen. Werden versteckt in die Überblick-PDF
+   eingebettet (%ESCAPEDATA), damit der Standalone-Feiditor sie rekonstruieren kann. */
+const RED_FIELDS = [
+  'Wandle diesen Text nun in eine PDF-Datei um und lade sie bei Moodle hoch.',
+  'Aufgabe 7: Nachdem du die Lösungen zu Aufgaben 1–6 auf Moodle hochgeladen hast, bearbeitest du die auf Moodle verlinkte Aufgabe „Text verfassen …".',
 ];
 
 function generateReflexionPdf(){
@@ -1344,11 +1359,11 @@ window.downloadOverviewPDF=()=>{
     const binary=atob(b64); const bytes=new Uint8Array(binary.length);
     for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
     const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
-    // Download läuft im Hintergrund (kein Verlassen der Abschluss-Seite)
+    // 1) PDF in neuem Tab öffnen (die finale Seite mit Feiditor-Link bleibt im Ausgangstab bestehen)
+    window.open(url,'_blank');
+    // 2) Dieselbe Datei zusätzlich im Hintergrund herunterladen
     const link=document.createElement('a'); link.href=url; link.download=filename;
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    // PDF zusätzlich in neuem Tab öffnen; die Abschluss-Seite (mit Feiditor-Link) bleibt erhalten
-    window.open(url,'_blank');
     setTimeout(()=>URL.revokeObjectURL(url),60000);
   }catch(e){ console.error(e); alert('Konnte die Datei nicht erzeugen: '+e.message); }
 };
