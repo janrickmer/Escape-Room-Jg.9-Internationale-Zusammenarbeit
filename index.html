@@ -1374,11 +1374,6 @@ window.downloadReflexionPDF=()=>{
     downloadPdfBase64(b64,`Reflexion_${name}_${state.code}.pdf`);
   }catch(e){ console.error(e); alert('Konnte die Datei nicht erzeugen: '+e.message); }
 };
-window.copyCode=async()=>{
-  try{ await navigator.clipboard.writeText(state.code);
-    const d=document.getElementById('copyDesc'); if(d) d.innerHTML='Code in die Zwischenablage kopiert. Trage ihn in die Moodle-Aufgabe ein.';
-  }catch(e){ const d=document.getElementById('copyDesc'); if(d) d.innerHTML='Code: <strong class="font-mono">'+state.code+'</strong> – bitte manuell kopieren.'; }
-};
 
 /* ============================================================
    DIGITALES ARBEITSBLATT IM FEIDITOR (Programmierung wie im Referenz-Escape-Room)
